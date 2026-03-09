@@ -114,11 +114,62 @@ body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;fo
 .cel-title{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--gold);}
 .cel-sub{font-size:12px;color:var(--muted);margin-top:5px;}
 .cel-close{margin-top:18px;padding:8px 22px;background:var(--gold);color:var(--bg);border:none;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;font-weight:500;}
+
+/* SEARCH */
+.sb-search{padding:10px 20px;border-bottom:1px solid var(--dim);}
+.search-input{width:100%;padding:7px 10px 7px 28px;background:var(--g2);border:1px solid var(--dim);color:var(--white);font-family:'DM Sans',sans-serif;font-size:11px;border-radius:2px;outline:none;transition:border-color .15s;appearance:none;}
+.search-input:focus{border-color:var(--gold);}
+.search-input::placeholder{color:var(--muted);}
+.search-wrap{position:relative;}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:11px;pointer-events:none;}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:6px;padding:0 20px 10px;flex-wrap:wrap;}
+.filter-btn{padding:4px 10px;background:none;border:1px solid var(--dim);color:var(--muted);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.5px;cursor:pointer;transition:all .15s;border-radius:1px;}
+.filter-btn:hover{border-color:var(--gold);color:var(--white);}
+.filter-btn.active{background:var(--gold-d);border-color:var(--gold);color:var(--gold);}
+
+/* EXPORT BTN */
+.export-btn{width:100%;padding:8px;background:none;border:1px solid var(--dim);color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;transition:all .15s;margin-bottom:6px;}
+.export-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+/* TASK FOCUS */
+.task:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;}
+
+/* TASK HIDDEN BY FILTER/SEARCH */
+.task.hidden{display:none;}
+.section.hidden{display:none;}
+
+/* HAMBURGER */
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:1001;background:var(--g2);border:1px solid var(--dim);color:var(--white);width:36px;height:36px;cursor:pointer;font-size:18px;line-height:1;border-radius:2px;}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .hamburger{display:flex;align-items:center;justify-content:center;}
+  .sidebar{position:fixed;left:-280px;z-index:1000;width:280px;min-width:280px;transition:left .25s ease;}
+  .sidebar.open{left:0;}
+  .sidebar-overlay.open{display:block;}
+  .main{padding:56px 16px 80px;max-width:100%;}
+  .phase-title{font-size:32px;}
+  .phase-stats{flex-wrap:wrap;gap:12px;}
+  .task{padding:10px 12px;}
+  .task-tags{gap:4px;}
+  .celebrate{padding:28px 24px;width:calc(100% - 32px);}
+}
+@media(max-width:480px){
+  .main{padding:52px 10px 60px;}
+  .phase-title{font-size:26px;}
+  .section-header{padding:8px 10px;}
+  .task{padding:8px 10px;gap:8px;}
+}
 </style>
 </head>
 <body>
 <div class="layout">
-<div class="sidebar">
+<button class="hamburger" id="hamburger" aria-label="Toggle sidebar">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
   <div class="sb-brand">
     <div class="brand-name">Safe <span>&</span> Secure</div>
     <div class="brand-sub">SEO MASTER CHECKLIST</div>
@@ -128,8 +179,22 @@ body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;fo
     <div class="prog-bar"><div class="prog-fill" id="global-bar" style="width:0%"></div></div>
     <div class="prog-nums"><span><span class="dn" id="global-done">0</span> done</span><span id="global-total">0</span> total</div>
   </div>
+  <div class="sb-search">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search tasks..." aria-label="Search tasks">
+    </div>
+  </div>
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">ALL</button>
+    <button class="filter-btn" data-filter="todo">TODO</button>
+    <button class="filter-btn" data-filter="done">DONE</button>
+  </div>
   <nav class="sb-nav" id="nav"></nav>
-  <div class="sb-foot"><button class="reset-btn" onclick="resetAll()">↺ RESET ALL PROGRESS</button></div>
+  <div class="sb-foot">
+    <button class="export-btn" onclick="exportProgress()">↓ EXPORT PROGRESS</button>
+    <button class="reset-btn" onclick="resetAll()">↺ RESET ALL PROGRESS</button>
+  </div>
 </div>
 <main class="main" id="main"></main>
 </div>
@@ -184,7 +249,11 @@ function buildUI(){
         const el=document.createElement('div');
         el.className='task'+(isDone(phase.id,si,ti)?' done':'');
         el.id=`t-${phase.id}-${si}-${ti}`;
+        el.setAttribute('role','checkbox');
+        el.setAttribute('aria-checked',isDone(phase.id,si,ti)?'true':'false');
+        el.setAttribute('tabindex','0');
         el.onclick=()=>toggle(phase.id,si,ti);
+        el.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(phase.id,si,ti);}};
         const tags=(task.tags||[]).map(([l,c])=>`<span class="tag tag-${c}">${l}</span>`).join('');
         el.innerHTML=`<div class="checkbox"><div class="checkmark"><svg viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><div class="task-body"><div class="task-text">${task.text}</div>${task.note?`<div class="task-note">${task.note}</div>`:''} ${tags?`<div class="task-tags">${tags}</div>`:''}</div>`;
         secEl.appendChild(el);
@@ -209,7 +278,7 @@ function updateAll(){
     if(pr)pr.textContent=total-done;
     phase.sections.forEach((sec,si)=>sec.tasks.forEach((_,ti)=>{
       const el=document.getElementById(`t-${phase.id}-${si}-${ti}`);
-      if(el)el.classList.toggle('done',isDone(phase.id,si,ti));
+      if(el){const d=isDone(phase.id,si,ti);el.classList.toggle('done',d);el.setAttribute('aria-checked',d?'true':'false');}
     }));
   });
   const{total,done}=countAll();
@@ -226,6 +295,7 @@ function showPhase(pi){
   document.getElementById(`phase-${pi}`).classList.add('active');
   document.querySelector(`[data-pi="${pi}"]`).classList.add('active');
   window.scrollTo(0,0);
+  if(window.innerWidth<=768){sidebar.classList.remove('open');sidebarOverlay.classList.remove('open');}
 }
 
 const celebrated=new Set();
@@ -236,16 +306,105 @@ function checkPhaseComplete(pid){
   const{total,done}=countPhase(phase);
   if(done===total&&total>0){
     celebrated.add(pid);
+    lastCompletedPhase=pid;
     document.getElementById('cel-title').textContent=`${phase.title} Complete!`;
     document.getElementById('cel-sub').textContent=`All ${total} tasks done. Time to move to the next phase.`;
     document.getElementById('celebrate').classList.add('show');
     document.getElementById('overlay').classList.add('show');
   }
 }
+let lastCompletedPhase=null;
 function closeCelebrate(){
   document.getElementById('celebrate').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
+  if(lastCompletedPhase!==null){
+    const idx=phases.findIndex(p=>p.id===lastCompletedPhase);
+    if(idx>=0&&idx<phases.length-1)showPhase(idx+1);
+    lastCompletedPhase=null;
+  }
 }
+
+// Search
+let searchTerm='';
+document.getElementById('searchInput').addEventListener('input',function(e){
+  searchTerm=e.target.value.toLowerCase().trim();
+  applyFilters();
+});
+
+// Filter
+let activeFilter='all';
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    activeFilter=this.dataset.filter;
+    applyFilters();
+  });
+});
+
+function applyFilters(){
+  phases.forEach((phase,pi)=>{
+    phase.sections.forEach((sec,si)=>{
+      let visibleInSection=0;
+      sec.tasks.forEach((task,ti)=>{
+        const el=document.getElementById(`t-${phase.id}-${si}-${ti}`);
+        if(!el)return;
+        const done=isDone(phase.id,si,ti);
+        const matchesFilter=activeFilter==='all'||(activeFilter==='done'&&done)||(activeFilter==='todo'&&!done);
+        const text=(task.text+(task.note||'')).toLowerCase();
+        const tags=(task.tags||[]).map(t=>t[0]).join(' ').toLowerCase();
+        const matchesSearch=!searchTerm||text.includes(searchTerm)||tags.includes(searchTerm);
+        const visible=matchesFilter&&matchesSearch;
+        el.classList.toggle('hidden',!visible);
+        if(visible)visibleInSection++;
+      });
+      const secEl=document.getElementById(`t-${phase.id}-${si}-${0}`)?.closest('.section');
+      if(secEl)secEl.classList.toggle('hidden',visibleInSection===0);
+    });
+  });
+}
+
+// Export progress as text
+function exportProgress(){
+  let out='SEO CHECKLIST — Safe & Secure Locksmith\nExported: '+new Date().toLocaleDateString()+'\n\n';
+  const{total,done}=countAll();
+  out+=`Overall: ${done}/${total} (${total?Math.round(done/total*100):0}%)\n\n`;
+  phases.forEach(phase=>{
+    const c=countPhase(phase);
+    out+=`${'='.repeat(50)}\n${phase.eyebrow}\n${phase.title.toUpperCase()} — ${c.done}/${c.total}\n${'='.repeat(50)}\n\n`;
+    phase.sections.forEach((sec,si)=>{
+      out+=`  ${sec.title}\n`;
+      sec.tasks.forEach((task,ti)=>{
+        const d=isDone(phase.id,si,ti);
+        out+=`    [${d?'x':' '}] ${task.text}\n`;
+        if(task.note)out+=`        ${task.note}\n`;
+      });
+      out+='\n';
+    });
+  });
+  const blob=new Blob([out],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='seo-checklist-progress.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Keyboard accessibility
+document.addEventListener('keydown',function(e){
+  if(e.target.classList.contains('search-input'))return;
+  if(e.key==='/'&&!e.ctrlKey&&!e.metaKey){
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+});
+
+// Mobile sidebar
+const hamburger=document.getElementById('hamburger');
+const sidebar=document.getElementById('sidebar');
+const sidebarOverlay=document.getElementById('sidebarOverlay');
+hamburger.addEventListener('click',()=>{sidebar.classList.toggle('open');sidebarOverlay.classList.toggle('open');});
+sidebarOverlay.addEventListener('click',()=>{sidebar.classList.remove('open');sidebarOverlay.classList.remove('open');});
 
 loadState();buildUI();updateAll();
 </script>
